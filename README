@@ -1,0 +1,12 @@
+
+to activate local env:
+ source bigtable/bin/activate     
+
+BigTable key:
+
+    Go through the dance to get your key here:
+    https://cloud.google.com/docs/authentication/getting-started#cloud-console
+
+    Save the key locally (In mycase key.json) and add it as an env variable:
+    export GOOGLE_APPLICATION_CREDENTIALS="key.json"
+    
