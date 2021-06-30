@@ -52,8 +52,10 @@ def read_file(filename, lines_already_processed):
     lines = f.readlines()
 
     # Ignore lines already processed
-    to_process_lines = [line for i, line in enumerate(lines) if i >= lines_already_processed]
-    data = [build_data_from_query_line(line, now) for line in to_process_lines]
+    if lines_already_processed is not None:
+        lines = [line for i, line in enumerate(lines) if i >= lines_already_processed]
+
+    data = [build_data_from_query_line(line, now) for line in lines]
     return len(lines), data
     
 
@@ -70,32 +72,52 @@ def main():
     if len(sys.argv) < 2:
         print("Please run with file to process as argument")
         return
-    filename = sys.argv[1]
+    filenames = sys.argv
 
-    lines_already_read = get_state()
+    filename_lines_read_pairing = get_state()
 
-    new_state, data = read_file(filename, lines_already_read)
-    try:
-        upload_it(data_to_upload_format(data))
-        update_state(new_state)
-    except NoRowsException:
-        print('No new query rows to process today')
+    
+    for f in filenames:
+        new_state, data = read_file(
+            f, filename_lines_read_pairing.get(f)
+        )
+        try:
+            upload_it(data_to_upload_format(data))
+            filename_lines_read_pairing[f] = new_state
+        except NoRowsException:
+            print('No new query rows to process today')
+
+    update_state(filename_lines_read_pairing)
 
 
-def update_state(lines_read):
+def update_state(file_to_lines_read):
     f = open(STATE_FILE, "w")
-    f.write(str(lines_read))
+    for name, lines_read in file_to_lines_read.items():
+        f.write(str(name)+"\n")
+        f.write(str(lines_read)+"\n")
 
 
+"""
+ This is a disgusting.
+ We assume each of the files passed in will have a saved state
+ If they don't we'll process the entire file.
+ If the service is started multiple times in a day we'll only process
+ the last 2 log files.
+ But hey! It's an experiment
+"""
 def get_state():
+    results = {}
     try:
-        f = open(STATE_FILE, "r")
-        lines_read = int(f.read())
+        with open(STATE_FILE, "r") as f:
+            content = f.readlines()
+            while content:
+                filename = content.next()
+                lines_read = int(content.next())
+                results[filename] = lines_read
         print('Processing from line {}'.format(lines_read))
     except:
         print('Failed to read state file resetting to 0')
-        lines_read = 0
-    return lines_read
+    return results
 
 
 if __name__ == "__main__":
